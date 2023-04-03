@@ -1,10 +1,67 @@
-##SimCSE with GLM initialization
-这个repo基于SimCSE的embedding model的训练。在SimCSE的基础上加入了用GLM last hidden states的作为encoder的初始化。
+# SimCSE with GLM initialization
 
-Data:
-  Training Data: CNewsSum (https://dqwang122.github.io/projects/CNewSum/) 下载下来以后用preprocess_CNewSum.py去process，然后把生成的.txt 放进data/
-  Eval Data: 因为SimCSE使用了SentEval这个package去做evaluation，这里面的所有tasks都是英文的，所以需要自己下载一个中文的数据去做eval。这里我们简易的用一个中文的STS-B去做evaluation。
+这个repo是基于SimCSE的embedding model的训练。在SimCSE的基础上加入了用GLM last hidden states的作为encoder的初始化。
 
+## Install
+
+```bash
+pip install transformers==4.23.1
+pip install torch
+pip install sentencepiece
+pip install datasets
+```
+
+## Data:
+  ### Training Data: 
+  CNewsSum (https://dqwang122.github.io/projects/CNewSum/) 下载下来以后用preprocess_CNewSum.py去process，然后把生成的.txt 放进data/
+    
+  ### Eval Data: 
+  
+  因为SimCSE使用了SentEval这个package去做evaluation，这里面的所有tasks都是英文的，所以需要自己下载一个中文的数据去做eval。这里我们简易的用一个中文的STS-B去做evaluation。数据已经放入SentEval里了，直接跑training的话会自动拿它做Dev set eval。
+
+## Training:
+
+  ### Training without GLM
+```bash
+sh run_unsup_chinese_bert_cnews.sh
+```
+
+  多卡的train一个没有GLM初始化的BERT encoder。model_name_or_path 那里选自己想用的Bert或者Roberta模型就行。如果是中文的话，可以用bert-base-chinese或者hfl/chinese-bert-wwm-ext。如果需要单卡训练的话就把distributed.launch那行comment了然后把上面那行comment out。
+  
+  ### Training with GLM
+```bash
+sh run_unsup_GLM_chinese_cnews.sh
+```
+
+这里和上面的区别在于最后一个argument --init_embeddings_model。这个argument 放你想要的huggingface上的GLM model的名字，比如THUDM/glm-large-chinese。有一个可能出现的问题是，在我的linux机器上，直接放这个名字从huggingface下载这个pretrained model缓存会有问题，在colab上好像不会出现这个问题。如果你也出现了可以先去git clone 你想要的model card到本地，然后在这里放model的本地位置从本地load就可以。
+  
+## Evaluation:
+  现在我还没在evaluation.py里加入带上GLM的inference，所以现在如果跑run_eval.sh只能用来evaluate没有GLM的model，或者是带GLM的model但是只用encoder去inference，这里还需要加一下。
+  
+  
+## Results:
+
+|  Model | STS-B-Chinese Dev |
+| --- | --- |
+| bert-base-chinese-SimCSE | 0.74  |
+| bert-base-chinese-SimCSE-GLM-large | 0.52  |
+
+
+
+## Model Architecture:
+
+### bert-base-chinese-SimCSE: 
+
+拿pretrained bert-base-chinese 作为base-model, 在我们的数据上做contrastive learning
+
+### bert-base-chinese-SimCSE-GLM-large: 
+
+拿GLM-large-chinese的last hidden states，过一遍fully connected layer，作为一个bert-base-chinese encoder的输入，去做contrastive learning，然后在inference time的时候也用GLM做了初始化，再放入encoder得到的embedding。训练的时候GLM是freeze的。
+
+
+
+<br><br>
+**************************** **Original SimCSE README** ****************************
 
 
 
