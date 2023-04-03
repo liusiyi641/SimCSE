@@ -17,6 +17,7 @@ from transformers import (
     AutoConfig,
     AutoModelForMaskedLM,
     AutoModelForSequenceClassification,
+    AutoModel,
     AutoTokenizer,
     DataCollatorForLanguageModeling,
     DataCollatorWithPadding,
@@ -121,6 +122,10 @@ class ModelArguments:
         metadata={
             "help": "Use MLP only during training"
         }
+    )
+    init_embeddings_model: Optional[str] = field(
+        default=None,
+        metadata={"help": "If we are initializing the encoder with hidden states from another pretrained model. This will be the model path or name from hugging face."}
     )
 
 
@@ -287,6 +292,7 @@ def main():
         transformers.utils.logging.enable_explicit_format()
     logger.info("Training/evaluation parameters %s", training_args)
 
+
     # Set seed before initializing model.
     set_seed(training_args.seed)
 
@@ -326,7 +332,7 @@ def main():
     if model_args.config_name:
         config = AutoConfig.from_pretrained(model_args.config_name, **config_kwargs)
     elif model_args.model_name_or_path:
-        config = AutoConfig.from_pretrained(model_args.model_name_or_path, **config_kwargs)
+        config = AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True, **config_kwargs)
     else:
         config = CONFIG_MAPPING[model_args.model_type]()
         logger.warning("You are instantiating a new config instance from scratch.")
@@ -340,7 +346,7 @@ def main():
     if model_args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name, **tokenizer_kwargs)
     elif model_args.model_name_or_path:
-        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, **tokenizer_kwargs)
+        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, trust_remote_code=True, **tokenizer_kwargs)
     else:
         raise ValueError(
             "You are instantiating a new tokenizer from scratch. This is not supported by this script."
@@ -356,7 +362,8 @@ def main():
                 cache_dir=model_args.cache_dir,
                 revision=model_args.model_revision,
                 use_auth_token=True if model_args.use_auth_token else None,
-                model_args=model_args                  
+                init_embeddings_model=model_args.init_embeddings_model,
+                model_args=model_args
             )
         elif 'bert' in model_args.model_name_or_path:
             model = BertForCL.from_pretrained(
@@ -366,6 +373,7 @@ def main():
                 cache_dir=model_args.cache_dir,
                 revision=model_args.model_revision,
                 use_auth_token=True if model_args.use_auth_token else None,
+                init_embeddings_model=model_args.init_embeddings_model,
                 model_args=model_args
             )
             if model_args.do_mlm:
@@ -531,6 +539,7 @@ def main():
 
     data_collator = default_data_collator if data_args.pad_to_max_length else OurDataCollatorWithPadding(tokenizer)
 
+
     trainer = CLTrainer(
         model=model,
         args=training_args,
@@ -565,7 +574,7 @@ def main():
     results = {}
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
-        results = trainer.evaluate(eval_senteval_transfer=True)
+        results = trainer.evaluate(eval_senteval_transfer=False)
 
         output_eval_file = os.path.join(training_args.output_dir, "eval_results.txt")
         if trainer.is_world_process_zero():
