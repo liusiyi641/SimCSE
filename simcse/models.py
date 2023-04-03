@@ -3,8 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.distributed as dist
 
+from simcse.modeling_glm import GLMModel, GLMPreTrainedModel
+
 import transformers
-from transformers import RobertaTokenizer
+from transformers import RobertaTokenizer, AutoModel, PreTrainedModel
 from transformers.models.roberta.modeling_roberta import RobertaPreTrainedModel, RobertaModel, RobertaLMHead
 from transformers.models.bert.modeling_bert import BertPreTrainedModel, BertModel, BertLMPredictionHead
 from transformers.activations import gelu
@@ -62,7 +64,7 @@ class Pooler(nn.Module):
 
     def forward(self, attention_mask, outputs):
         last_hidden = outputs.last_hidden_state
-        pooler_output = outputs.pooler_output
+        # pooler_output = outputs.pooler_output
         hidden_states = outputs.hidden_states
 
         if self.pooler_type in ['cls_before_pooler', 'cls']:
@@ -122,6 +124,9 @@ def cl_forward(cls,
     attention_mask = attention_mask.view((-1, attention_mask.size(-1))) # (bs * num_sent len)
     if token_type_ids is not None:
         token_type_ids = token_type_ids.view((-1, token_type_ids.size(-1))) # (bs * num_sent, len)
+
+    if inputs_embeds is not None:
+        input_ids=None
 
     # Get raw embeddings
     outputs = encoder(
@@ -225,7 +230,7 @@ def cl_forward(cls,
         loss=loss,
         logits=cos_sim,
         hidden_states=outputs.hidden_states,
-        attentions=outputs.attentions,
+        # attentions=outputs.attentions,
     )
 
 
@@ -246,6 +251,9 @@ def sentemb_forward(
 
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
 
+    if inputs_embeds is not None:
+        input_ids=None
+        
     outputs = encoder(
         input_ids,
         attention_mask=attention_mask,
@@ -283,6 +291,17 @@ class BertForCL(BertPreTrainedModel):
         if self.model_args.do_mlm:
             self.lm_head = BertLMPredictionHead(config)
 
+        if self.model_args.init_embeddings_model:
+            if "glm" in self.model_args.init_embeddings_model:
+                self.glm = GLMModel.from_pretrained(self.model_args.init_embeddings_model, trust_remote_code=True)
+                self.fc = nn.Linear(self.glm.config.hidden_size, config.hidden_size)
+                for param in self.glm.parameters():
+                    param.requires_grad = False
+                # for param in self.fc.parameters():
+                #     param.requires_grad = False
+            else:
+                raise NotImplementedError
+
         cl_init(self, config)
 
     def forward(self,
@@ -300,6 +319,26 @@ class BertForCL(BertPreTrainedModel):
         mlm_input_ids=None,
         mlm_labels=None,
     ):
+        if self.model_args.init_embeddings_model:
+            input_ids_for_glm = input_ids.view((-1, input_ids.size(-1)))  # (bs * num_sent, len)
+            attention_mask_for_glm = attention_mask.view((-1, attention_mask.size(-1)))  # (bs * num_sent len)
+            if token_type_ids is not None:
+                token_type_ids_for_glm = token_type_ids.view((-1, token_type_ids.size(-1)))  # (bs * num_sent, len)
+
+            outputs_from_glm = self.glm(input_ids_for_glm,
+                               attention_mask=attention_mask_for_glm,
+                               token_type_ids=token_type_ids_for_glm,
+                               position_ids=position_ids,
+                               head_mask=head_mask,
+                               inputs_embeds=inputs_embeds,
+                               labels=labels,
+                               output_attentions=output_attentions,
+                               output_hidden_states=output_hidden_states,
+                               return_dict=return_dict,
+                               )
+
+            inputs_embeds = self.fc(outputs_from_glm.last_hidden_state)
+
         if sent_emb:
             return sentemb_forward(self, self.bert,
                 input_ids=input_ids,
@@ -342,6 +381,17 @@ class RobertaForCL(RobertaPreTrainedModel):
         if self.model_args.do_mlm:
             self.lm_head = RobertaLMHead(config)
 
+        if self.model_args.init_embeddings_model:
+            if "glm" in self.model_args.init_embeddings_model:
+                self.glm = GLMModel.from_pretrained(self.model_args.init_embeddings_model, trust_remote_code=True)
+                self.fc = nn.Linear(self.glm.config.hidden_size, config.hidden_size)
+                for param in self.glm.parameters():
+                    param.requires_grad = False
+                for param in self.fc.parameters():
+                    param.requires_grad = False
+            else:
+                raise NotImplementedError
+
         cl_init(self, config)
 
     def forward(self,
@@ -359,6 +409,27 @@ class RobertaForCL(RobertaPreTrainedModel):
         mlm_input_ids=None,
         mlm_labels=None,
     ):
+
+        if self.model_args.init_embeddings_model and not sent_emb:
+            input_ids_for_glm = input_ids.view((-1, input_ids.size(-1)))  # (bs * num_sent, len)
+            attention_mask_for_glm = attention_mask.view((-1, attention_mask.size(-1)))  # (bs * num_sent len)
+            if token_type_ids is not None:
+                token_type_ids_for_glm = token_type_ids.view((-1, token_type_ids.size(-1)))  # (bs * num_sent, len)
+
+            outputs_from_glm = self.glm(input_ids_for_glm,
+                               attention_mask=attention_mask_for_glm,
+                               token_type_ids=token_type_ids_for_glm,
+                               position_ids=position_ids,
+                               head_mask=head_mask,
+                               inputs_embeds=inputs_embeds,
+                               labels=labels,
+                               output_attentions=output_attentions,
+                               output_hidden_states=output_hidden_states,
+                               return_dict=return_dict,
+                               )
+
+            inputs_embeds = self.fc(outputs_from_glm.last_hidden_state)
+
         if sent_emb:
             return sentemb_forward(self, self.roberta,
                 input_ids=input_ids,
@@ -387,3 +458,4 @@ class RobertaForCL(RobertaPreTrainedModel):
                 mlm_input_ids=mlm_input_ids,
                 mlm_labels=mlm_labels,
             )
+
