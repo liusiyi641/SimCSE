@@ -1,3 +1,24 @@
+##SimCSE with GLM initialization
+这个repo基于SimCSE的embedding model的训练。在SimCSE的基础上加入了用GLM last hidden states的作为encoder的初始化。
+
+Data:
+  Training Data: CNewsSum (https://dqwang122.github.io/projects/CNewSum/) 下载下来以后用preprocess_CNewSum.py去process，然后把生成的.txt 放进data/
+  Eval Data: 因为SimCSE使用了SentEval这个package去做evaluation，这里面的所有tasks都是英文的，所以需要自己下载一个中文的数据去做eval。这里我们简易的用一个中文的STS-B去做evaluation。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## SimCSE: Simple Contrastive Learning of Sentence Embeddings
 
 This repository contains the code and pre-trained models for our paper [SimCSE: Simple Contrastive Learning of Sentence Embeddings](https://arxiv.org/abs/2104.08821).
