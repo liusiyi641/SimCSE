@@ -15,14 +15,14 @@ python -m torch.distributed.launch --nproc_per_node $NUM_GPU --master_port $PORT
     --train_file data/all_news_and_summaries.txt \
     --output_dir result/simcse-unsup-chinese-bert-wwm-ext-bestCSTB \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 128 \
+    --per_device_train_batch_size 64 \
     --learning_rate 3e-5 \
     --max_seq_length 32 \
     --evaluation_strategy steps \
     --metric_for_best_model stsb_spearman \
     --load_best_model_at_end \
-    --save_steps 500 \
-    --eval_steps 500 \
+    --save_steps 1000 \
+    --eval_steps 1000 \
     --pooler_type cls \
     --mlp_only_train \
     --overwrite_output_dir \
