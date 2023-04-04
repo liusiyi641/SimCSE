@@ -13,7 +13,7 @@ pip install datasets
 
 ## Data:
   ### Training Data: 
-  CNewsSum (https://dqwang122.github.io/projects/CNewSum/) 下载下来以后用preprocess_CNewSum.py去process，然后把生成的.txt 放进data/
+  CNewsSum (https://dqwang122.github.io/projects/CNewSum/) 下载下来以后用preprocess_CNewSum.py去process，然后把生成的.txt 放进data/，就是现在的结果使用的training data。data/ 里面还有一个test_run_10k.txt 是一个sample data，按照这个格式，每一行是一句完整的话，然后train的时候会自动拿每一句话和dropout过后的这句话作为positive examples训练。
     
   ### Eval Data: 
   
