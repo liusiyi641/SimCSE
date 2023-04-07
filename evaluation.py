@@ -7,6 +7,8 @@ from prettytable import PrettyTable
 import torch
 import transformers
 from transformers import AutoModel, AutoTokenizer
+from simcse.models import BertForCL,RobertaForCL
+from argparse import Namespace
 
 # Set up logger
 logging.basicConfig(format='%(asctime)s : %(message)s', level=logging.DEBUG)
@@ -46,15 +48,29 @@ def main():
                      'MR', 'CR', 'MPQA', 'SUBJ', 'SST2', 'TREC', 'MRPC',
                      'SICKRelatedness', 'STSBenchmark'], 
             help="Tasks to evaluate on. If '--task_set' is specified, this will be overridden")
+
+    parser.add_argument("--init_embeddings_model", type=str, default=None)
+
+
     
     args = parser.parse_args()
     
     # Load transformers' model checkpoint
-    model = AutoModel.from_pretrained(args.model_name_or_path)
+    if "glm" in args.model_name_or_path:
+        model_args = Namespace(do_mlm=None, init_embeddings_model=args.init_embeddings_model, pooler_type=args.pooler, temp=0.05, mlp_only_train=True)
+        if "roberta" in args.model_name_or_path:
+            model = RobertaForCL.from_pretrained(args.model_name_or_path, model_args=model_args)
+        elif "bert" in args.model_name_or_path:
+            model = BertForCL.from_pretrained(args.model_name_or_path, model_args=model_args)
+        else:
+            raise NotImplementedError
+    else:
+        model = AutoModel.from_pretrained(args.model_name_or_path)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-    
+    model.eval()
+
     # Set up the tasks
     if args.task_set == 'sts':
         args.tasks = ['STS12', 'STS13', 'STS14', 'STS15', 'STS16', 'STSBenchmark', 'SICKRelatedness']
@@ -111,7 +127,10 @@ def main():
         
         # Get raw embeddings
         with torch.no_grad():
-            outputs = model(**batch, output_hidden_states=True, return_dict=True)
+            if isinstance(model, BertForCL) or isinstance(model, RobertaForCL):
+                outputs = model(**batch, output_hidden_states=True, return_dict=True, sent_emb=True)
+            else:
+                outputs = model(**batch, output_hidden_states=True, return_dict=True)
             last_hidden = outputs.last_hidden_state
             pooler_output = outputs.pooler_output
             hidden_states = outputs.hidden_states

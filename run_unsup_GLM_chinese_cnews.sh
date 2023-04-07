@@ -13,7 +13,7 @@ export OMP_NUM_THREADS=4
 python -m torch.distributed.launch --nproc_per_node $NUM_GPU --master_port $PORT_ID train.py \
     --model_name_or_path bert-base-chinese \
     --train_file data/all_news_and_summaries.txt \
-    --output_dir result/simcse-unsup-glm-large-chinese-bert-base-chinese-bestCSTB \
+    --output_dir result/simcse-unsup-glm-large-chinese-bert-base-chinese-bestCSTB-testrun \
     --num_train_epochs 1 \
     --per_device_train_batch_size 64 \
     --learning_rate 3e-5 \

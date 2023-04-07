@@ -321,6 +321,7 @@ class BertForCL(BertPreTrainedModel):
         mlm_input_ids=None,
         mlm_labels=None,
     ):
+
         if self.model_args.init_embeddings_model:
             input_ids_for_glm = input_ids.view((-1, input_ids.size(-1)))  # (bs * num_sent, len)
             attention_mask_for_glm = attention_mask.view((-1, attention_mask.size(-1)))  # (bs * num_sent len)
@@ -412,7 +413,7 @@ class RobertaForCL(RobertaPreTrainedModel):
         mlm_labels=None,
     ):
 
-        if self.model_args.init_embeddings_model and not sent_emb:
+        if self.model_args.init_embeddings_model:
             input_ids_for_glm = input_ids.view((-1, input_ids.size(-1)))  # (bs * num_sent, len)
             attention_mask_for_glm = attention_mask.view((-1, attention_mask.size(-1)))  # (bs * num_sent len)
             if token_type_ids is not None:
