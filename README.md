@@ -41,10 +41,11 @@ sh run_unsup_GLM_chinese_cnews.sh
   
 ## Results:
 
-|  Model | STS-B-Chinese Dev |
+|  Model | STS-B-Chinese Dev | STS-B-Chinese Test
 | --- | --- |
-| bert-base-chinese-SimCSE | 0.74  |
-| bert-base-chinese-SimCSE-GLM-large | 0.52  |
+| bert-base-chinese-SimCSE | 0.74  | 0.68
+| bert-base-chinese-SimCSE-GLM-large | 0.52  | 0.42
+
 
 
 
